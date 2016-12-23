@@ -25,7 +25,7 @@ class SimplePipedInputStream(internal val src:SimplePipedOutputStream):InputStre
         when (result)
         {
         // if EOF, return -1 as specified by java docs
-            -1 -> return result
+            -1 -> return -1
 
         // if data was actually read, return the read data
             1 -> return data[0].toInt().and(0xFF)
