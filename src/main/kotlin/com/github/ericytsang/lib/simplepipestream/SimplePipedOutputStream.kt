@@ -1,14 +1,13 @@
 package com.github.ericytsang.lib.simplepipestream
 
-import java.io.IOException
-import java.io.OutputStream
+import com.github.ericytsang.lib.abstractstream.AbstractOutputStream
 import java.util.concurrent.ArrayBlockingQueue
 import java.util.concurrent.BlockingQueue
 import java.util.concurrent.LinkedBlockingQueue
 import java.util.concurrent.locks.ReentrantLock
 import kotlin.concurrent.withLock
 
-class SimplePipedOutputStream(val bufferSize:Int = SimplePipedOutputStream.DEFAULT_BUFFER_SIZE):OutputStream()
+class SimplePipedOutputStream(val bufferSize:Int = SimplePipedOutputStream.DEFAULT_BUFFER_SIZE):AbstractOutputStream()
 {
     companion object
     {
@@ -26,11 +25,8 @@ class SimplePipedOutputStream(val bufferSize:Int = SimplePipedOutputStream.DEFAU
     internal val unblockOnRead = mutex.newCondition()
     internal val unblockOnWriteOrEof = mutex.newCondition()
 
-    override fun write(b:Int) = mutex.withLock()
+    override fun doWrite(b:Int) = mutex.withLock()
     {
-        // return early if already closed
-        if (isClosed) throw IOException("stream closed")
-
         // wait for room to become available
         while (buffer.remainingCapacity() == 0)
         {
@@ -44,15 +40,58 @@ class SimplePipedOutputStream(val bufferSize:Int = SimplePipedOutputStream.DEFAU
         unblockOnWriteOrEof.signal()
     }
 
-    override fun close() = mutex.withLock()
-    {
-        // return early if already closed
-        if (isClosed) return@withLock
-        isClosed = true
+    private var isEof = false
 
-        // notify write
-        unblockOnWriteOrEof.signal()
+    internal fun doRead(b:ByteArray,off:Int,len:Int):Int = mutex.withLock()
+    {
+        // if it's not EOF...
+        val result = if (!isEof)
+        {
+            // wait for bytes to become available for reading
+            while (buffer.size == 0 && !isClosed)
+            {
+                unblockOnWriteOrEof.await()
+            }
+
+            // if there are readable bytes that available for reading...
+            if (buffer.size > 0)
+            {
+                val availableBytesToTransfer = Math.min(len,buffer.size)
+
+                // transfer them to the client's buffer
+                for (i in 0..availableBytesToTransfer-1)
+                {
+                    b[off+i] = buffer.take().toByte()
+                }
+
+                availableBytesToTransfer
+            }
+
+            // ...else return -1 indicating EOF
+            else
+            {
+                require(buffer.size == 0 && isClosed)
+                isEof = true
+                -1
+            }
+        }
+        else
+        {
+            -1
+        }
+
+        // notify read
+        unblockOnRead.signal()
+
+        result
     }
 
-    internal var isClosed = false
+    override fun doClose() = mutex.withLock()
+    {
+        // notify write
+        unblockOnWriteOrEof.signal()
+
+        // close
+        setClosed()
+    }
 }

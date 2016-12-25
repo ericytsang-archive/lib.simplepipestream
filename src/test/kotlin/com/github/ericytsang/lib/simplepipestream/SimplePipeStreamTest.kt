@@ -105,4 +105,35 @@ class SimplePipeStreamTest
         assert(sink.read() == -1)
         assert(sink.read() == -1)
     }
+
+    @Test
+    fun pipeTestThreadInterrupt()
+    {
+        src.write(0)
+        src.write(2)
+        src.write(5)
+        src.write(6)
+        src.write(127)
+        src.write(128)
+        src.write(129)
+        src.write(254)
+        src.write(255)
+        thread {
+            Thread.sleep(500)
+            src.close()
+        }
+        assert(sink.read() == 0)
+        assert(sink.read() == 2)
+        assert(sink.read() == 5)
+        assert(sink.read() == 6)
+        assert(sink.read() == 127)
+        assert(sink.read() == 128)
+        assert(sink.read() == 129)
+        assert(sink.read() == 254)
+        assert(sink.read() == 255)
+        assert(sink.read() == -1)
+        assert(sink.read() == -1)
+        assert(sink.read() == -1)
+        assert(sink.read() == -1)
+    }
 }
