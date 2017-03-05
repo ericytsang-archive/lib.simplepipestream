@@ -34,6 +34,7 @@ class SimplePipedOutputStream(val bufferSize:Int = SimplePipedOutputStream.DEFAU
         }
 
         // write the data
+        check(!isClosed)
         buffer.put(b.and(0xFF))
 
         // notify write
@@ -86,12 +87,9 @@ class SimplePipedOutputStream(val bufferSize:Int = SimplePipedOutputStream.DEFAU
         result
     }
 
-    override fun doClose() = mutex.withLock()
+    override fun oneShotClose() = mutex.withLock()
     {
         // notify write
         unblockOnWriteOrEof.signal()
-
-        // close
-        setClosed()
     }
 }

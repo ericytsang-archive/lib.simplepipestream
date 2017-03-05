@@ -9,10 +9,9 @@ class SimplePipedInputStream(internal val src:SimplePipedOutputStream):AbstractI
 {
     override fun available():Int = src.buffer.size
 
-    override fun doClose()
+    override fun oneShotClose()
     {
         src.close()
-        doNothing()
     }
 
     override fun doRead(b:ByteArray,off:Int,len:Int):Int = src.doRead(b,off,len)
